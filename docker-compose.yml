@@ -1,0 +1,103 @@
+version: '3.8'
+
+services:
+  ollama:
+    image: ollama/ollama
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    restart: always
+    volumes:
+      - ollama_data:/root/.ollama 
+    networks:
+      - ollama-net
+    runtime: nvidia  # Adiciona o suporte ao runtime nvidia (necessário para usar GPUs)
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]  # Garante que o serviço utilize a GPU
+
+  #app:
+  #    build: .
+  #    ports:
+  #      - "8501:8501"
+  #    depends_on:
+  #      - ollama
+  #    volumes:
+  #      - .:/app
+  #    environment:
+  #      - OLLAMA_HOST=http://ollama:11434
+  #    networks:
+  #      - ollama-net
+
+
+  postgres:
+    image: postgres:latest  # Usando a imagem oficial do PostgreSQL
+    container_name: postgres
+    restart: always  # Reinicia automaticamente o contêiner em caso de falha
+    environment:
+      - POSTGRES_USER=${DB_POSTGRESDB_USER} # Nome do usuário do banco de dados
+      - POSTGRES_PASSWORD=${DB_POSTGRESDB_PASSWORD}  # Senha do usuário do banco de dados
+      - POSTGRES_DB=database  # Nome do banco de dados a ser criado
+    volumes:
+      - postgres_data:/var/lib/postgresql/data  # Volume para persistência de dados
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"  # Expõe a porta 5432 para a máquina host
+    networks:
+      - ollama-net  # Coloca o serviço "postgres" na mesma rede do serviço "ollama"
+
+
+  n8n:
+      image: docker.n8n.io/n8nio/n8n
+      restart: always
+      ports:
+        - 5678:5678
+      depends_on:
+        - postgres
+        - ollama
+      environment:
+        - DB_TYPE=postgresdb
+        - DB_POSTGRESDB_HOST=postgres
+        - DB_POSTGRESDB_DATABASE=n8n
+        - DB_POSTGRESDB_PORT=5432
+        - DB_POSTGRESDB_USER=${DB_POSTGRESDB_USER}
+        - DB_POSTGRESDB_PASSWORD=${DB_POSTGRESDB_PASSWORD}
+        - DB_POSTGRESDB_SCHEMA=public
+        - N8N_PROTOCOL=${N8N_PROTOCOL}
+        - N8N_HOST=${N8N_HOST}
+        - N8N_RUNNERS_ENABLED=${N8N_RUNNERS_ENABLED}    
+        - NODE_ENV=${NODE_ENV} 
+      volumes:
+        - n8n_data:/home/node/.n8n
+      networks:
+        - ollama-net
+
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: open-webui
+    ports:
+      - "3000:8080"  # <- Mapeando corretamente: HOST:CONTAINER
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+    depends_on:
+      - n8n
+      - postgres
+      - ollama
+    volumes:
+      - ./openwebui_data:/app/backend/data
+    restart: always
+    networks:
+      - ollama-net
+
+networks:
+  ollama-net:
+
+volumes:
+  ollama_data:
+  postgres_data:
+  openwebui_data:
+  n8n_data:

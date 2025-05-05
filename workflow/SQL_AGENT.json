@@ -1,0 +1,306 @@
+{
+  "name": "SQL AGENT",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "d1e6b7c3-01ac-4d6f-992f-0e1f8f445257",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -320,
+        100
+      ],
+      "id": "64bd956b-1e34-49b0-8ea5-1f7cf8ee654e",
+      "name": "Webhook",
+      "webhookId": "d1e6b7c3-01ac-4d6f-992f-0e1f8f445257"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "652271b2-c70f-487e-be05-348d890e1bf5",
+              "name": "chatInput",
+              "value": "={{ $json?.chatInput || $json.body.chatInput }}",
+              "type": "string"
+            },
+            {
+              "id": "ffacf292-2e64-438b-afa0-39cbcf63fcad",
+              "name": "sessionId",
+              "value": "={{ $json?.sessionId || $json.body.sessionId}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -100,
+        20
+      ],
+      "id": "1ef24b85-39cf-44f4-87c0-2b7ccd339bfd",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "Você é um assistente de banco de dados. Serão feitas perguntas em linguagem natural. Você pode usar a ferramenta \"DB Schema\" para entender as tabelas disponíveis no banco de dados e, em seguida, buscar a definição da tabela usando a ferramenta \"Get Table Schema\" disponível para todas as tabelas que possam conter os dados relevantes.\nPor fim, execute a ferramenta \"Get Table Schema\" para obter os dados e responda em linguagem natural.\n\nImportante: coloque o nome da tabela e o nome da coluna entre aspas duplas.\nData de hoje: {{$now}}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.9,
+      "position": [
+        180,
+        -40
+      ],
+      "id": "c31e8948-b821-4030-9463-feb60db7cb5f",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT table_schema, table_name\nFROM information_schema.tables\nWHERE table_type = 'BASE TABLE' AND table_schema = 'public';\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgresTool",
+      "typeVersion": 2.6,
+      "position": [
+        520,
+        140
+      ],
+      "id": "bdf5b61c-bb4c-42b1-9019-682611ccb1c5",
+      "name": "DB Schema",
+      "credentials": {
+        "postgres": {
+          "id": "nqWFSS1UXA1fYesP",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n    c.column_name,\n    c.data_type,\n    c.is_nullable,\n    c.column_default,\n    tc.constraint_type,\n    ccu.table_name AS referenced_table,\n    ccu.column_name AS referenced_column\nFROM \n    information_schema.columns c\nLEFT JOIN \n    information_schema.key_column_usage kcu \n    ON c.table_name = kcu.table_name \n    AND c.column_name = kcu.column_name\nLEFT JOIN \n    information_schema.table_constraints tc \n    ON kcu.constraint_name = tc.constraint_name\n    AND tc.constraint_type = 'FOREIGN KEY'\nLEFT JOIN\n    information_schema.constraint_column_usage ccu\n    ON tc.constraint_name = ccu.constraint_name\nWHERE \n    c.table_name = '{{ $fromAI(\"table_name\") }}' -- Your table name\n    AND c.table_schema = 'public' -- Ensure it's in the right schema\nORDER BY \n    c.ordinal_position;\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgresTool",
+      "typeVersion": 2.6,
+      "position": [
+        660,
+        140
+      ],
+      "id": "26cfcd98-88d7-455d-aec4-880b3c995748",
+      "name": "Get Table Schema",
+      "credentials": {
+        "postgres": {
+          "id": "nqWFSS1UXA1fYesP",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "{{ $fromAI('query') }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgresTool",
+      "typeVersion": 2.6,
+      "position": [
+        820,
+        140
+      ],
+      "id": "ff2c805b-c3e3-44c6-900c-5f9a4db84d0c",
+      "name": "Get Queried Data",
+      "credentials": {
+        "postgres": {
+          "id": "nqWFSS1UXA1fYesP",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -320,
+        -60
+      ],
+      "id": "8039236f-b9b2-4ce0-a447-7fcdaa9f753a",
+      "name": "When chat message received",
+      "webhookId": "8cdd8df1-4d5c-4550-90d9-ab5c85e0117c"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.2,
+      "position": [
+        900,
+        -40
+      ],
+      "id": "58858add-c0e0-4dfb-970c-94d8ae529414",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {},
+      "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
+      "typeVersion": 1.3,
+      "position": [
+        300,
+        140
+      ],
+      "id": "003b7297-e034-43c0-9311-ee14ccb899d4",
+      "name": "Postgres Chat Memory",
+      "credentials": {
+        "postgres": {
+          "id": "BZ5TH1zlMveVA7WK",
+          "name": "Postgres n8n"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAzureOpenAi",
+      "typeVersion": 1,
+      "position": [
+        120,
+        140
+      ],
+      "id": "95421992-7f06-47f2-bad9-a24c262b80a9",
+      "name": "Azure OpenAI Chat Model",
+      "credentials": {
+        "azureOpenAiApi": {
+          "id": "PQ8e5je3GM6ljrZh",
+          "name": "Azure Open AI account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DB Schema": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Table Schema": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Queried Data": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres Chat Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Azure OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "77871b4c-1e91-4b9d-acec-7bad668841e1",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "f8157a14fe012e6819471f8ae0d17fead36d9e8a25bdc63452545680513e85c6"
+  },
+  "id": "N0SlxFc4YeIXbf28",
+  "tags": []
+}

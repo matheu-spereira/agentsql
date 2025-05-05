@@ -1,0 +1,5 @@
+/openwebui_data/
+/apps/
+app.py
+Dockerfile
+*.Identifier
