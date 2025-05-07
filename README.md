@@ -38,13 +38,14 @@ git clone https://github.com/matheu-spereira/agentsql.git
 cd agentsql
 ```
 
-Se estiver usando Ollama, adicione um modelo LLM local. Exemplo:
-```
-ollama pull qwen2.5:14b
-```
 Suba os contêineres
 ```
 docker-compose up --build -d
+```
+
+Se estiver usando Ollama, adicione um modelo LLM local. Exemplo:
+```
+ollama pull qwen2.5:14b
 ```
 
 ## Acesse as interfaces
